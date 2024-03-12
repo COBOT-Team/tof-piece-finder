@@ -1,0 +1,75 @@
+tof_piece_finder:
+  camera_base_topic:
+    {
+      type: string,
+      default_value: "tof/depth/image_raw",
+      description: "The base topic of the camera publisher that contains the chessboard image.",
+    }
+
+  pieces_image_topic:
+    {
+      type: string,
+      default_value: "tof/pieces/image_raw",
+      description: "The topic to publish the masked image to.",
+    }
+
+  points_topic:
+    {
+      type: string,
+      default_value: "tof/pieces/points",
+      description:
+        "The topic to publish points to. Each point represents the top-center of a piece on the
+        board.",
+    }
+
+  filter:
+    max_height_difference:
+      {
+        type: double,
+        default_value: 0.02,
+        description:
+          "The maximum distance from the top of the tallest piece that will be retained. This should
+          be the distance from the top of the tallest piece to the top of the shortest piece, plus
+          some buffer.",
+      }
+    gripper_mask_file:
+      {
+        type: string,
+        default_value: "package://tof_piece_finder/config/gripper_mask.png",
+        description:
+          "The path to the gripper mask file. This mask is used to ignore the gripper when finding
+          the pieces.",
+      }
+    blur_size:
+      {
+        type: int,
+        default_value: 5,
+        description: "The size of the blur kernel to use when filtering the image.",
+      }
+    limits:
+      max_distance:
+        {
+          type: double,
+          default_value: 0.3,
+          description: "The largest distance from the camera to consider.",
+        }
+      min_distance:
+        {
+          type: double,
+          default_value: 0.076,
+          description: "The smallest distance from the camera to consider.",
+        }
+      min_piece_size:
+        {
+          type: int,
+          default_value: 12,
+          description:
+            "The minimum number of pixels that a piece must have to be considered a piece.",
+        }
+      max_piece_size:
+        {
+          type: int,
+          default_value: 64,
+          description:
+            "The maximum number of pixels that a piece must have to be considered a piece.",
+        }
