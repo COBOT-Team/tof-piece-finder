@@ -6,11 +6,18 @@ tof_piece_finder:
       description: "The base topic of the camera publisher that contains the chessboard image.",
     }
 
-  pieces_image_topic:
+  binary_image_topic:
     {
       type: string,
-      default_value: "tof/pieces/image_raw",
-      description: "The topic to publish the masked image to.",
+      default_value: "tof/pieces/binary/image_raw",
+      description: "The topic to publish the thresholded image to.",
+    }
+
+  annotated_image_topic:
+    {
+      type: string,
+      default_value: "tof/pieces/annotated/image_raw",
+      description: "The topic to publish the annotated image to.",
     }
 
   points_topic:

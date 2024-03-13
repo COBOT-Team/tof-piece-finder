@@ -74,8 +74,10 @@ public:
     // Setup the publishers.
     pointcloud_pub_ =
         node->create_publisher<sensor_msgs::msg::PointCloud2>(params_->points_topic, 10);
-    image_pub_ =
-        make_unique<image_transport::Publisher>(it_->advertise(params_->pieces_image_topic, 1));
+    binary_image_pub_ =
+        make_unique<image_transport::Publisher>(it_->advertise(params_->binary_image_topic, 1));
+    annotated_image_pub_ =
+        make_unique<image_transport::Publisher>(it_->advertise(params_->annotated_image_topic, 1));
 
     // Setup the camera subscriber.
     auto bound_callback = bind(&TofPieceFinder::image_callback, this, _1, _2);
@@ -220,6 +222,11 @@ private:
       highest_points.emplace_back(array<int, 2>({best_col, best_row}));
     }
 
+    // Create a copy of the depth image to draw points on.
+    cv::Mat depth_annotated_grey, depth_annotated;
+    cv::normalize(cv_ptr->image, depth_annotated_grey, 0, 255, cv::NORM_MINMAX, CV_8U);
+    cv::cvtColor(depth_annotated_grey, depth_annotated, cv::COLOR_GRAY2RGB);
+
     // Create a point cloud message from the connected components.
     int n_points = valid_labels.size();
     pointcloud_msg_.header.stamp = now;
@@ -231,6 +238,9 @@ private:
     for (int i = 0; i < n_points; i++) {
       int col = highest_points[i][0];
       int row = highest_points[i][1];
+
+      // Draw point on annotated image.
+      cv::circle(depth_annotated, cv::Point2i(col, row), 2, cv::Scalar(255, 0, 0), -1);
 
       // Convert the pixel to a 3D point.
       float point[3];
@@ -246,19 +256,28 @@ private:
     // Publish the point cloud message.
     pointcloud_pub_->publish(pointcloud_msg_);
 
-    // Publish the thresholded image for debugging.
-    cv_bridge::CvImage out_msg;
-    out_msg.header.stamp = now;
-    out_msg.header.frame_id = camera_frame;
-    out_msg.encoding = sensor_msgs::image_encodings::MONO8;
-    out_msg.image = binary;
-    image_pub_->publish(out_msg.toImageMsg());
+    // Publish the thresholded image.
+    cv_bridge::CvImage bin_msg;
+    bin_msg.header.stamp = now;
+    bin_msg.header.frame_id = camera_frame;
+    bin_msg.encoding = sensor_msgs::image_encodings::MONO8;
+    bin_msg.image = binary;
+    binary_image_pub_->publish(bin_msg.toImageMsg());
+
+    // Publish the annotated image.
+    cv_bridge::CvImage ann_msg;
+    ann_msg.header.stamp = now;
+    ann_msg.header.frame_id = camera_frame;
+    ann_msg.encoding = sensor_msgs::image_encodings::RGB8;
+    ann_msg.image = depth_annotated;
+    annotated_image_pub_->publish(ann_msg.toImageMsg());
   }
 
   unique_ptr<ParamListener> param_listener_;        //< Parameter listener for this node.
   unique_ptr<Params> params_;                       //< The parameters for this node.
   unique_ptr<image_transport::ImageTransport> it_;  //< Image transport for this node.
-  unique_ptr<image_transport::Publisher> image_pub_;
+  unique_ptr<image_transport::Publisher> binary_image_pub_;
+  unique_ptr<image_transport::Publisher> annotated_image_pub_;
   unique_ptr<image_transport::CameraSubscriber> camera_sub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_pub_;
 
