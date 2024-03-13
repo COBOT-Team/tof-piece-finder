@@ -26,7 +26,7 @@ tof_piece_finder:
     max_height_difference:
       {
         type: double,
-        default_value: 0.02,
+        default_value: 0.065,
         description:
           "The maximum distance from the top of the tallest piece that will be retained. This should
           be the distance from the top of the tallest piece to the top of the shortest piece, plus
@@ -35,7 +35,7 @@ tof_piece_finder:
     gripper_mask_file:
       {
         type: string,
-        default_value: "package://tof_piece_finder/config/gripper_mask.png",
+        default_value: "config/gripper_mask.png",
         description:
           "The path to the gripper mask file. This mask is used to ignore the gripper when finding
           the pieces.",
@@ -43,33 +43,33 @@ tof_piece_finder:
     blur_size:
       {
         type: int,
-        default_value: 5,
+        default_value: 15,
         description: "The size of the blur kernel to use when filtering the image.",
       }
     limits:
       max_distance:
         {
           type: double,
-          default_value: 0.3,
+          default_value: 0.5,
           description: "The largest distance from the camera to consider.",
         }
       min_distance:
         {
           type: double,
-          default_value: 0.076,
+          default_value: 0.105,
           description: "The smallest distance from the camera to consider.",
         }
       min_piece_size:
         {
           type: int,
-          default_value: 12,
+          default_value: 64,
           description:
             "The minimum number of pixels that a piece must have to be considered a piece.",
         }
       max_piece_size:
         {
           type: int,
-          default_value: 64,
+          default_value: 3000,
           description:
             "The maximum number of pixels that a piece must have to be considered a piece.",
         }

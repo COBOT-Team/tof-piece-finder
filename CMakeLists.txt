@@ -55,6 +55,8 @@ target_link_libraries(tof_piece_finder PUBLIC
 install(TARGETS tof_piece_finder
   DESTINATION lib/${PROJECT_NAME})
 
+install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights

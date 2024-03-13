@@ -1,5 +1,8 @@
 #include <opencv2/calib3d.hpp>
 #include <opencv2/opencv.hpp>
+#include <ament_index_cpp/get_package_share_directory.hpp>
+#include <filesystem>
+#include <limits>
 
 #include "cv_bridge/cv_bridge.h"
 #include "image_transport/image_transport.hpp"
@@ -10,6 +13,7 @@
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "tof_piece_finder_params.hpp"
 
+namespace fs = std::filesystem;
 using namespace std;
 using namespace tof_piece_finder;
 using std::placeholders::_1;
@@ -37,8 +41,22 @@ public:
     node = rclcpp::Node::make_shared("tof_piece_finder");
     param_listener_ = make_unique<ParamListener>(node);
     params_ = make_unique<Params>(param_listener_->get_params());
-    gripper_mask_ = cv::imread(params_->filter.gripper_mask_file, cv::IMREAD_GRAYSCALE);
     it_ = make_unique<image_transport::ImageTransport>(node);
+
+    // Load the gripper mask.
+    fs::path share_dir(ament_index_cpp::get_package_share_directory("tof_piece_finder"));
+    fs::path gripper_mask_file(params_->filter.gripper_mask_file);
+    fs::path full_path = share_dir / gripper_mask_file;
+    cv::Mat gripper_mask_u8 = cv::imread(full_path, cv::IMREAD_GRAYSCALE);
+    gripper_mask_ = cv::Mat(gripper_mask_u8.rows, gripper_mask_u8.cols, CV_32FC1);
+    for (int row = 0; row < gripper_mask_.rows; ++row) {
+      for (int col = 0; col < gripper_mask_.cols; ++col) {
+        if (gripper_mask_u8.at<uint8_t>(row, col) == 0)
+          gripper_mask_.at<float>(row, col) = numeric_limits<float>::infinity();
+        else
+          gripper_mask_.at<float>(row, col) = 1.f;
+      }
+    }
 
     // Setup the point cloud message.
     pointcloud_msg_.height = 1;
@@ -104,7 +122,6 @@ private:
     // Check for parameter updates.
     if (param_listener_->is_old(*params_)) {
       params_ = make_unique<Params>(param_listener_->get_params());
-      gripper_mask_ = cv::imread(params_->filter.gripper_mask_file, cv::IMREAD_GRAYSCALE);
     }
 
     // Convert the image message to a cv::Mat.
@@ -130,7 +147,10 @@ private:
 
     // Apply the gripper mask to the image.
     cv::Mat masked;
-    cv::bitwise_and(blurred, gripper_mask_, masked);
+    if (gripper_mask_.data == nullptr)
+      masked = blurred;
+    else
+      masked = blurred.mul(gripper_mask_);
 
     // Create a sorted vector of distances from the image, filtering out the gripper mask and any
     // distances outside the min and max limits.
@@ -145,20 +165,24 @@ private:
       }
     }
     sort(distances.begin(), distances.end());
-
-    // TODO: Consider removing outliers from the distances.
+    if (distances.size() < 2) {
+      RCLCPP_WARN(get_logger(), "Cannot find anything");
+      return;
+    }
 
     // Find the threshold distance. This is either the median distance in the filtered image, or
     // a constant offset from the nearest distance. The nearer of the two is used.
-    float nearest_distance_cutoff = distances.front() + params_->filter.max_height_difference;
-    float median_distance = distances[distances.size() / 2];
-    float threshold_distance = min(nearest_distance_cutoff, median_distance);
+    float top_5pct = distances.size() * 0.05;
+    float nearest_distance_cutoff = distances[top_5pct] + params_->filter.max_height_difference;
+    float median_distance_cutoff = distances[distances.size() / 2] - 0.01f;
+    float threshold_distance = min(nearest_distance_cutoff, median_distance_cutoff);
 
     // Create a binary image from the threshold distance. We remove any pixels that are further away
     // than the threshold distance. This should remove the chessboard and any other objects that are
     // further away than the pieces.
     cv::Mat binary;
-    cv::threshold(masked, binary, threshold_distance, 1, cv::THRESH_BINARY_INV);
+    cv::threshold(masked, binary, threshold_distance, 255, cv::THRESH_BINARY_INV);
+    binary.convertTo(binary, CV_8UC1);
 
     // Find connected components in the binary image. The first component is the background, so we
     // ignore it.
@@ -176,6 +200,26 @@ private:
       valid_labels.push_back(i);
     }
 
+    // Find the nearest point of every component.
+    vector<array<int, 2>> highest_points;
+    for (size_t i = 0; i < valid_labels.size(); ++i) {
+      int label = valid_labels[i];
+      float best = numeric_limits<float>::infinity();
+      int best_row = 0;
+      int best_col = 0;
+      for (int row = 0; row < masked.rows; ++row) {
+        for (int col = 0; col < masked.cols; ++col) {
+          float value = masked.at<float>(row, col);
+          if (labels.at<int32_t>(row, col) == label && value < best) {
+            best_row = row;
+            best_col = col;
+            best = value;
+          }
+        }
+      }
+      highest_points.emplace_back(array<int, 2>({best_col, best_row}));
+    }
+
     // Create a point cloud message from the connected components.
     int n_points = valid_labels.size();
     pointcloud_msg_.header.stamp = now;
@@ -185,15 +229,14 @@ private:
     pointcloud_msg_.width = n_points;
     pointcloud_msg_.row_step = n_points * 12;
     for (int i = 0; i < n_points; i++) {
-      int label = valid_labels[i];
-      int col = centroids.at<double>(label, 0);
-      int row = centroids.at<double>(label, 1);
+      int col = highest_points[i][0];
+      int row = highest_points[i][1];
 
       // Convert the pixel to a 3D point.
       float point[3];
-      point[0] = (((cx - col)) / fx) * masked.at<float>(row, col);  // X
-      point[1] = (((cy - row)) / fy) * masked.at<float>(row, col);  // Y
-      point[2] = masked.at<float>(row, col);                        // Z
+      point[0] = -(((cx - col)) / fx) * masked.at<float>(row, col);  // X
+      point[1] = -(((cy - row)) / fy) * masked.at<float>(row, col);  // Y
+      point[2] = masked.at<float>(row, col);                         // Z
 
       // Add the point to the point cloud message.
       uint8_t* data = reinterpret_cast<uint8_t*>(point);
