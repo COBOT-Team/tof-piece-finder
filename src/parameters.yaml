@@ -1,9 +1,15 @@
 tof_piece_finder:
-  camera_base_topic:
+  depth_camera_base_topic:
     {
       type: string,
       default_value: "tof/depth/image_raw",
-      description: "The base topic of the camera publisher that contains the chessboard image.",
+      description: "The base topic of the depth camera publisher that contains the image.",
+    }
+  ir_camera_base_topic:
+    {
+      type: string,
+      default_value: "tof/ir/image_raw",
+      description: "The base topic of the IR camera publisher that contains the image.",
     }
 
   binary_image_topic:
@@ -57,13 +63,13 @@ tof_piece_finder:
       max_distance:
         {
           type: double,
-          default_value: 0.5,
+          default_value: 0.3,
           description: "The largest distance from the camera to consider.",
         }
       min_distance:
         {
           type: double,
-          default_value: 0.105,
+          default_value: 0.09,
           description: "The smallest distance from the camera to consider.",
         }
       min_piece_size:
