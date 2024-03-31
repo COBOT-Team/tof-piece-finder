@@ -204,7 +204,7 @@ private:
         const float intensity = ir_img_.at<float>(i, j);
         // if (intensity < min_intensity) min_intensity = intensity;
         // if (intensity > max_intensity) max_intensity = intensity;
-        if (intensity < 8000) depth_masked.at<float>(i, j) = numeric_limits<float>::infinity();
+        if (intensity < 4300) depth_masked.at<float>(i, j) = numeric_limits<float>::infinity();
       }
     }
     // RCLCPP_INFO(node->get_logger(), "Intensity: %0.3f -> %0.3f", min_intensity, max_intensity);
