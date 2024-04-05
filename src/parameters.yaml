@@ -35,6 +35,13 @@ tof_piece_finder:
         board.",
     }
 
+  camera_points_topic:
+    {
+      type: string,
+      default_value: "tof/pieces/camera_points",
+      description: "The topic to publish points to, measured as pixels in the image",
+    }
+
   filter:
     max_height_difference:
       {

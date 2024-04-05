@@ -4,6 +4,7 @@
 #include <opencv2/calib3d.hpp>
 #include <opencv2/opencv.hpp>
 
+#include "chess_msgs/msg/camera_points.hpp"
 #include "cv_bridge/cv_bridge.h"
 #include "image_transport/image_transport.hpp"
 #include "opencv2/highgui/highgui.hpp"
@@ -14,6 +15,7 @@
 #include "tof_piece_finder_params.hpp"
 
 namespace fs = std::filesystem;
+
 using namespace std;
 using namespace tof_piece_finder;
 using std::placeholders::_1;
@@ -74,6 +76,8 @@ public:
     // Setup the publishers.
     pointcloud_pub_ =
         node->create_publisher<sensor_msgs::msg::PointCloud2>(params_->points_topic, 10);
+    camera_points_pub_ =
+        node->create_publisher<chess_msgs::msg::CameraPoints>(params_->camera_points_topic, 10);
     binary_image_pub_ =
         make_unique<image_transport::Publisher>(it_->advertise(params_->binary_image_topic, 1));
     annotated_image_pub_ =
@@ -292,6 +296,9 @@ private:
     pointcloud_msg_.data.reserve(n_points * 12);
     pointcloud_msg_.width = n_points;
     pointcloud_msg_.row_step = n_points * 12;
+    vector<chess_msgs::msg::Point2> cam_pts;
+    const int32_t half_cols = depth_masked.cols * 0.5;
+    const int32_t half_rows = depth_masked.rows * 0.5;
     for (int i = 0; i < n_points; i++) {
       const double col_d = centroids.at<double>(valid_labels[i], 0);
       const double row_d = centroids.at<double>(valid_labels[i], 1);
@@ -314,10 +321,23 @@ private:
       // Add the point to the point cloud message.
       uint8_t* data = reinterpret_cast<uint8_t*>(point);
       pointcloud_msg_.data.insert(pointcloud_msg_.data.end(), data, data + 12);
+
+      // Add to camera points.
+      cam_pts.emplace_back([&] {
+        chess_msgs::msg::Point2 point;
+        point.x = col - half_cols;
+        point.y = -row + half_rows;
+        return point;
+      }());
     }
 
     // Publish the point cloud message.
     pointcloud_pub_->publish(pointcloud_msg_);
+
+    // Publish camera points message.
+    chess_msgs::msg::CameraPoints camera_points_msg;
+    camera_points_msg.points = cam_pts;
+    camera_points_pub_->publish(camera_points_msg);
 
     // Publish the thresholded image.
     cv_bridge::CvImage bin_msg;
@@ -344,6 +364,7 @@ private:
   unique_ptr<image_transport::CameraSubscriber> depth_camera_sub_;
   unique_ptr<image_transport::CameraSubscriber> ir_camera_sub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_pub_;
+  rclcpp::Publisher<chess_msgs::msg::CameraPoints>::SharedPtr camera_points_pub_;
 
   cv::Mat depth_img_;
   cv::Mat ir_img_;

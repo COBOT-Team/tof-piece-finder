@@ -16,6 +16,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(chess_msgs REQUIRED)
 find_package(generate_parameter_library REQUIRED)
 find_package(OpenCV REQUIRED)
 
@@ -38,6 +39,7 @@ ament_target_dependencies(tof_piece_finder PUBLIC
   tf2
   tf2_ros
   tf2_geometry_msgs
+  chess_msgs
 )
 
 target_include_directories(tof_piece_finder PUBLIC
