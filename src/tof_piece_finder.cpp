@@ -297,8 +297,8 @@ private:
     pointcloud_msg_.width = n_points;
     pointcloud_msg_.row_step = n_points * 12;
     vector<chess_msgs::msg::Point2> cam_pts;
-    const int32_t half_cols = depth_masked.cols * 0.5;
-    const int32_t half_rows = depth_masked.rows * 0.5;
+    const int32_t half_cols = 100;
+    const int32_t half_rows = 84;
     for (int i = 0; i < n_points; i++) {
       const double col_d = centroids.at<double>(valid_labels[i], 0);
       const double row_d = centroids.at<double>(valid_labels[i], 1);
